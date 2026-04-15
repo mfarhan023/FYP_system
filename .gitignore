@@ -1,0 +1,18 @@
+# Environment variables (contains DB credentials — never commit!)
+.env
+
+# Local SQLite database (replaced by Supabase)
+ezveri.db
+
+# Large PhishTank blacklist CSVs (imported to Supabase once)
+phishtank.csv
+verified_online.csv
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS files
+.DS_Store
+Thumbs.db
