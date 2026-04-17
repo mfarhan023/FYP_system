@@ -13,9 +13,7 @@
             <div class="textarea-wrapper">
                 <textarea id="emailContent" name="email_content" class="email-input" placeholder="Paste here" rows="9"
                     maxlength="10000" required></textarea>
-                <div class="char-counter">
-                    <span id="charCount">0</span> CHARS
-                </div>
+
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn-analyze" id="analyzeBtn">
@@ -50,18 +48,14 @@
     function setSample(type) {
         const ta = document.getElementById('emailContent');
         ta.value = SAMPLES[type];
-        updateCharCount();
+
         ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
         ta.focus();
     }
     function clearForm() {
         document.getElementById('emailContent').value = '';
-        updateCharCount();
+
     }
-    function updateCharCount() {
-        document.getElementById('charCount').textContent =
-            document.getElementById('emailContent').value.length.toLocaleString();
-    }
-    document.getElementById('emailContent').addEventListener('input', updateCharCount);
+
 </script>
 {% endblock %}

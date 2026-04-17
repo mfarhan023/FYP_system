@@ -207,15 +207,6 @@ main { flex: 1; }
   box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
   background: #fff;
 }
-.char-counter {
-  position: absolute;
-  bottom: 10px;
-  right: 14px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text-light);
-  letter-spacing: 0.5px;
-}
 .form-actions {
   display: flex;
   gap: 10px;
