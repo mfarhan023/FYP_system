@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import os
 import psycopg2
 import psycopg2.extras
@@ -29,7 +30,9 @@ class DbLogger:
                         content_preview TEXT,
                         label TEXT,
                         url_count INTEGER,
-                        blacklisted_count INTEGER
+                        blacklisted_count INTEGER,
+                        heuristic_score INTEGER,
+                        triggered_features TEXT
                     )
                 ''')
                 c.execute('''
@@ -41,16 +44,25 @@ class DbLogger:
                         phishtank_status TEXT
                     )
                 ''')
+                # Migration: add heuristic columns to existing deployments
+                for col, coltype in [('heuristic_score', 'INTEGER'), ('triggered_features', 'TEXT')]:
+                    try:
+                        c.execute(f'ALTER TABLE analysis_log ADD COLUMN IF NOT EXISTS {col} {coltype}')
+                    except Exception:
+                        pass
             conn.commit()
 
     def log_result(self, result: dict) -> int:
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         with self._connect() as conn:
             with conn.cursor() as c:
+                # Serialize triggered_features list to JSON string for storage
+                features_json = json.dumps(result.get('triggered_features', []))
                 c.execute('''
                     INSERT INTO analysis_log
-                        (timestamp, content_preview, label, url_count, blacklisted_count)
-                    VALUES (%s, %s, %s, %s, %s)
+                        (timestamp, content_preview, label, url_count, blacklisted_count,
+                         heuristic_score, triggered_features)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 ''', (
                     timestamp,
@@ -58,6 +70,8 @@ class DbLogger:
                     result.get('label', 'Unknown'),
                     result.get('url_count', 0),
                     result.get('blacklisted_count', 0),
+                    result.get('heuristic_score'),
+                    features_json,
                 ))
                 analysis_id = c.fetchone()[0]
                 for url_info in result.get('url_evidence', []):
@@ -88,6 +102,12 @@ class DbLogger:
                 if not row:
                     return None
                 result = dict(row)
+                # Deserialize triggered_features JSON string back to a list
+                raw_features = result.get('triggered_features') or '[]'
+                try:
+                    result['triggered_features'] = json.loads(raw_features)
+                except (json.JSONDecodeError, TypeError):
+                    result['triggered_features'] = []
                 c.execute('SELECT * FROM url_log WHERE analysis_id = %s', (analysis_id,))
                 result['url_evidence'] = []
                 for r in c.fetchall():
@@ -106,7 +126,9 @@ class DbLogger:
                 confirmed = c.fetchone()[0]
                 c.execute("SELECT COUNT(*) FROM analysis_log WHERE label = 'Safe'")
                 safe = c.fetchone()[0]
-        return {'total': total, 'confirmed': confirmed, 'safe': safe}
+                c.execute("SELECT COUNT(*) FROM analysis_log WHERE label = 'Suspicious'")
+                suspicious = c.fetchone()[0]
+        return {'total': total, 'confirmed': confirmed, 'safe': safe, 'suspicious': suspicious}
 
     def delete_analysis(self, analysis_id: int):
         with self._connect() as conn:

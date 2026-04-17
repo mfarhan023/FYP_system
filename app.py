@@ -2,7 +2,7 @@ import os
 import io
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session
 from dotenv import load_dotenv
-from analyzer_engine import AnalyzerEngine
+from analyzer_engine import AnalyzerEngine, weighted_heuristic_score
 from db_logger import DbLogger
 
 # Load .env file for local development (ignored in production/Vercel)
@@ -31,6 +31,24 @@ def analyze():
         return redirect(url_for('index'))
 
     result = engine.analyze(email_text)
+
+    # ── Heuristic fallback ──────────────────────────────────────────────
+    # Only run the weighted heuristic scorer if the blacklist found nothing.
+    # If blacklisted, the label stays 'Confirmed Phishing' and we skip this.
+    if result['blacklisted_count'] == 0:
+        heuristic = weighted_heuristic_score(result['urls_found'], email_text)
+        result['heuristic_label']     = heuristic['final_label']
+        result['heuristic_score']     = heuristic['total_score']
+        result['triggered_features']  = heuristic['triggered_features']
+        # Promote label to 'Suspicious' if heuristic says so
+        if heuristic['final_label'] == 'Suspicious':
+            result['label'] = 'Suspicious'
+    else:
+        result['heuristic_label']    = None
+        result['heuristic_score']    = None
+        result['triggered_features'] = []
+    # ───────────────────────────────────────────────────────────────────
+
     analysis_id = logger.log_result(result)
     result['id'] = analysis_id
     session['last_result'] = result
