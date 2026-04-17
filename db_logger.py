@@ -31,6 +31,7 @@ class DbLogger:
                         label TEXT,
                         url_count INTEGER,
                         blacklisted_count INTEGER,
+                        heuristic_label TEXT,
                         heuristic_score INTEGER,
                         triggered_features TEXT
                     )
@@ -45,7 +46,11 @@ class DbLogger:
                     )
                 ''')
                 # Migration: add heuristic columns to existing deployments
-                for col, coltype in [('heuristic_score', 'INTEGER'), ('triggered_features', 'TEXT')]:
+                for col, coltype in [
+                    ('heuristic_label', 'TEXT'),
+                    ('heuristic_score', 'INTEGER'),
+                    ('triggered_features', 'TEXT')
+                ]:
                     try:
                         c.execute(f'ALTER TABLE analysis_log ADD COLUMN IF NOT EXISTS {col} {coltype}')
                     except Exception:
@@ -61,8 +66,8 @@ class DbLogger:
                 c.execute('''
                     INSERT INTO analysis_log
                         (timestamp, content_preview, label, url_count, blacklisted_count,
-                         heuristic_score, triggered_features)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                         heuristic_label, heuristic_score, triggered_features)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 ''', (
                     timestamp,
@@ -70,6 +75,7 @@ class DbLogger:
                     result.get('label', 'Unknown'),
                     result.get('url_count', 0),
                     result.get('blacklisted_count', 0),
+                    result.get('heuristic_label'),
                     result.get('heuristic_score'),
                     features_json,
                 ))

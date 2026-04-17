@@ -2,7 +2,8 @@ import os
 import io
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session
 from dotenv import load_dotenv
-from analyzer_engine import AnalyzerEngine, weighted_heuristic_score
+from analyzer_engine import AnalyzerEngine
+from heuristic_scorer import WeightedHeuristicScorer
 from db_logger import DbLogger
 
 # Load .env file for local development (ignored in production/Vercel)
@@ -12,6 +13,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'ezveri-phish-secret-2024')
 
 engine = AnalyzerEngine()
+heuristic_scorer = WeightedHeuristicScorer()
 logger = DbLogger()
 
 
@@ -36,13 +38,13 @@ def analyze():
     # Only run the weighted heuristic scorer if the blacklist found nothing.
     # If blacklisted, the label stays 'Confirmed Phishing' and we skip this.
     if result['blacklisted_count'] == 0:
-        heuristic = weighted_heuristic_score(result['urls_found'], email_text)
-        result['heuristic_label']     = heuristic['final_label']
-        result['heuristic_score']     = heuristic['total_score']
+        heuristic = heuristic_scorer.score(email_text, result['urls_found'])
+        result['heuristic_label']     = heuristic['label']
+        result['heuristic_score']     = heuristic['score']
         result['triggered_features']  = heuristic['triggered_features']
-        # Promote label to 'Suspicious' if heuristic says so
-        if heuristic['final_label'] == 'Suspicious':
-            result['label'] = 'Suspicious'
+        # Promote label if the heuristic finds a higher risk level.
+        if heuristic['label'] in ('Suspicious', 'Confirmed Phishing'):
+            result['label'] = heuristic['label']
     else:
         result['heuristic_label']    = None
         result['heuristic_score']    = None
@@ -59,6 +61,14 @@ def analyze():
 def result(analysis_id):
     stored = logger.get_analysis_by_id(analysis_id)
     if stored:
+        last_result = session.get('last_result')
+        if last_result and last_result.get('id') == analysis_id:
+            if stored.get('heuristic_score') is None and last_result.get('heuristic_score') is not None:
+                stored['heuristic_score'] = last_result['heuristic_score']
+            if stored.get('heuristic_label') is None and last_result.get('heuristic_label') is not None:
+                stored['heuristic_label'] = last_result['heuristic_label']
+            if not stored.get('triggered_features') and last_result.get('triggered_features'):
+                stored['triggered_features'] = last_result['triggered_features']
         return render_template('result.html', result=stored)
     result_data = session.get('last_result')
     if result_data and result_data.get('id') == analysis_id:
