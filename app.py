@@ -108,12 +108,38 @@ def delete_analysis(analysis_id):
     return redirect(url_for('history'))
 
 
-@app.route('/debug-score')
-def debug_score():
+@app.route('/debug-analyze')
+def debug_analyze():
     import json
     test_text = "Congratulations! You are the lucky winner of our annual draw. Click the link to claim your prize immediately before it expires!"
-    h = heuristic_scorer.score(test_text, [])
-    return json.dumps(h, indent=2), 200, {'Content-Type': 'application/json'}
+
+    # Step 1: Run analyzer engine
+    result = engine.analyze(test_text)
+    step1 = {
+        'label_after_blacklist': result['label'],
+        'blacklisted_count': result['blacklisted_count'],
+        'url_count': result['url_count'],
+        'urls_found': result['urls_found'],
+    }
+
+    # Step 2: Run heuristic scorer (same logic as analyze route)
+    heuristic_ran = False
+    heuristic_result = None
+    final_label = result['label']
+
+    if result['blacklisted_count'] == 0:
+        heuristic_ran = True
+        heuristic = heuristic_scorer.score(test_text, result['urls_found'])
+        heuristic_result = heuristic
+        if heuristic['label'] in ('Suspicious', 'Confirmed Phishing'):
+            final_label = heuristic['label']
+
+    return json.dumps({
+        'step1_analyzer': step1,
+        'step2_heuristic_ran': heuristic_ran,
+        'step2_heuristic_result': heuristic_result,
+        'final_label': final_label,
+    }, indent=2), 200, {'Content-Type': 'application/json'}
 
 
 if __name__ == '__main__':
