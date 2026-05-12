@@ -42,9 +42,10 @@ def analyze():
         result['heuristic_label']     = heuristic['label']
         result['heuristic_score']     = heuristic['score']
         result['triggered_features']  = heuristic['triggered_features']
-        # Promote label if the heuristic finds a higher risk level.
+        # Heuristic can only promote label to 'Suspicious'.
+        # 'Confirmed Phishing' is reserved EXCLUSIVELY for PhishTank blacklist matches.
         if heuristic['label'] in ('Suspicious', 'Confirmed Phishing'):
-            result['label'] = heuristic['label']
+            result['label'] = 'Suspicious'
     else:
         result['heuristic_label']    = None
         result['heuristic_score']    = None
