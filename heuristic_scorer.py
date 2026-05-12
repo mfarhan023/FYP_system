@@ -3,248 +3,167 @@ import re
 
 class WeightedHeuristicScorer:
     """
-    Applies weighted heuristic rules to determine if email content is phishing.
-    Thresholds: score >= 12 → Confirmed Phishing, score >= 6 → Suspicious, else → Safe
+    Weighted heuristic scoring for phishing email detection.
+    Thresholds: score >= 10 → Confirmed Phishing, >= 5 → Suspicious, else → Safe
     """
 
-    URGENCY_WORDS = [
-        'urgent', 'immediately', 'expire', 'expires', 'expiring', 'act now',
-        'action required', 'verify', 'verify now', 'confirm', 'suspended',
-        'deactivated', 'blocked', 'limited', 'restricted', 'update your',
-        'update now', 'respond immediately', 'failure to', 'final notice',
-        'last warning', 'warning', 'alert', 'attention', 'important notice'
+    REWARD_PHRASES = [
+        'congratulations', 'lucky winner', 'you have won', "you've won",
+        'prize', 'reward', 'lottery', 'selected winner', 'unclaimed funds',
+        'million dollar', 'inheritance',
     ]
 
-    TIME_PRESSURE = [
-        r'within \d+ hour', r'within \d+ day', r'in \d+ hour', r'in \d+ day',
-        r'\d+ hours?', r'24 hours?', r'48 hours?', r'72 hours?', r'before .{0,20} expires?',
-        r'deadline', r'by \w+ \d+', r'ends? today', r'last chance'
+    THREAT_PHRASES = [
+        'account will be', 'account suspended', 'account blocked',
+        'account deleted', 'account terminated', 'legal action',
+        'unauthorized access', 'suspicious activity detected',
     ]
 
-    SENSITIVE_WORDS = [
-        'password', 'passwd', 'login credential', 'otp', 'one-time password',
-        'pin', 'social security', 'ssn', 'bank account', 'credit card',
-        'debit card', 'card number', 'cvv', 'banking credential', 'banking detail',
-        'banking information', 'username and password', 'mother\'s maiden', 'secret question'
+    URGENCY_PHRASES = [
+        'immediately', 'urgent', 'act now', 'action required',
+        'expires', 'expiring', 'respond now', 'respond immediately',
+        'final notice', 'last warning', 'limited time', 'do not delay',
     ]
 
-    THREAT_REWARD_WORDS = [
-        'your account will be', 'account will be closed', 'account will be deleted',
-        'account will be terminated', 'account will be suspended', 'will be deleted',
-        'will be terminated', 'legal action', 'law enforcement', 'prosecuted',
-        'congratulations', 'you have won', 'you\'ve won', 'prize', 'reward', 'lottery',
-        'million dollar', 'inheritance', 'unclaimed', 'lucky winner', 'selected'
+    TIME_PRESSURE_PATTERNS = [
+        r'within \d+ hours?', r'within \d+ days?', r'in \d+ hours?',
+        r'24 hours?', r'48 hours?', r'before .{0,30} expires?',
+        r'ends? today', r'last chance', r'deadline',
     ]
 
-    GENERIC_CLICK = [
-        'click here', 'click below', 'click the link', 'click this link',
-        'tap here', 'follow this link', 'use this link', 'access the link',
-        'open the link', 'visit the link'
+    SENSITIVE_PHRASES = [
+        'password', 'credit card', 'bank account', 'otp',
+        'one-time password', 'pin number', 'cvv', 'ssn',
+        'social security', 'banking details', 'login credentials',
+    ]
+
+    CLICK_PHRASES = [
+        'click here', 'click the link', 'click below',
+        'follow this link', 'tap here', 'open the link', 'visit this link',
     ]
 
     URL_SHORTENERS = [
-        'bit.ly', 'tinyurl.com', 'goo.gl', 'ow.ly', 't.co', 'is.gd',
-        'buff.ly', 'adf.ly', 'shorte.st', 'mcaf.ee', 'rb.gy', 'cutt.ly',
-        'shorturl.at', 'tiny.cc', 'clck.ru', 'bit.do', 'su.pr'
+        'bit.ly', 'tinyurl', 'goo.gl', 'ow.ly', 't.co',
+        'buff.ly', 'is.gd', 'rb.gy', 'cutt.ly', 'tiny.cc',
     ]
-
-    LEGITIMATE_DOMAINS = [
-        'google.com', 'microsoft.com', 'apple.com', 'amazon.com', 'facebook.com',
-        'twitter.com', 'linkedin.com', 'github.com', 'youtube.com', 'instagram.com',
-        'maybank.com', 'cimb.com', 'publicbank.com', 'rhbbank.com', 'hongleongbank.com',
-        'bankislam.com', 'ambank.com', 'affinbank.com', 'bankrakyat.com',
-        'paypal.com', 'dropbox.com', 'adobe.com', 'salesforce.com', 'zoom.us',
-        'netflix.com', 'spotify.com', 'slack.com', 'notion.so', 'atlassian.com'
-    ]
-
-    def __init__(self):
-        self.max_score = 15
 
     def score(self, email_text: str, urls: list) -> dict:
-        """
-        Score the email content and return result dict.
-        """
-        text_lower = email_text.lower()
+        text = email_text.lower()
+        total = 0
         triggered = []
-        total_score = 0
-        has_legitimate_domain = False
 
-        # --- URL-based rules ---
+        # Rule 1: Sensitive info request — Big (+5)
+        for phrase in self.SENSITIVE_PHRASES:
+            if phrase in text:
+                total += 5
+                triggered.append({
+                    'feature_name': f'Sensitive Info Request: "{phrase}"',
+                    'severity': 'Big',
+                    'points': 5,
+                })
+                break
+
+        # Rule 2: Reward / prize language — Big (+4)
+        for phrase in self.REWARD_PHRASES:
+            if phrase in text:
+                total += 4
+                triggered.append({
+                    'feature_name': 'Reward or Prize Language',
+                    'severity': 'Big',
+                    'points': 4,
+                })
+                break
+
+        # Rule 3: Threat language — Medium (+3)
+        for phrase in self.THREAT_PHRASES:
+            if phrase in text:
+                total += 3
+                triggered.append({
+                    'feature_name': 'Threat Language Detected',
+                    'severity': 'Medium',
+                    'points': 3,
+                })
+                break
+
+        # Rule 4: Urgency words — Medium (+2)
+        for phrase in self.URGENCY_PHRASES:
+            if phrase in text:
+                total += 2
+                triggered.append({
+                    'feature_name': f'Urgency Language: "{phrase}"',
+                    'severity': 'Medium',
+                    'points': 2,
+                })
+                break
+
+        # Rule 5: Time pressure — Small (+1)
+        for pattern in self.TIME_PRESSURE_PATTERNS:
+            if re.search(pattern, text):
+                total += 1
+                triggered.append({
+                    'feature_name': 'Time Pressure Language',
+                    'severity': 'Small',
+                    'points': 1,
+                })
+                break
+
+        # Rule 6: Generic click phrases — Small (+1)
+        for phrase in self.CLICK_PHRASES:
+            if phrase in text:
+                total += 1
+                triggered.append({
+                    'feature_name': f'Generic Click Phrase: "{phrase}"',
+                    'severity': 'Small',
+                    'points': 1,
+                })
+                break
+
+        # URL-based rules
         for url in urls:
             url_lower = url.lower()
 
-            # Check if URL uses a legitimate domain (reduces suspicion)
-            for legit in self.LEGITIMATE_DOMAINS:
-                if legit in url_lower:
-                    has_legitimate_domain = True
-
-            # Rule 1: IP address in URL (Big: +3)
+            # Rule 7: IP address in URL — Big (+3)
             if re.search(r'https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', url_lower):
-                total_score += 3
+                total += 3
                 triggered.append({
-                    'feature': 'IP Address in URL',
-                    'severity': 'BIG',
-                    'weight': 3
+                    'feature_name': 'IP Address in URL',
+                    'severity': 'Big',
+                    'points': 3,
                 })
 
-            # Rule 2: URL shortener (Big: +3)
+            # Rule 8: URL shortener — Medium (+2)
             for shortener in self.URL_SHORTENERS:
                 if shortener in url_lower:
-                    total_score += 3
+                    total += 2
                     triggered.append({
-                        'feature': f'URL Shortener Detected ({shortener})',
-                        'severity': 'BIG',
-                        'weight': 3
+                        'feature_name': f'URL Shortener ({shortener})',
+                        'severity': 'Medium',
+                        'points': 2,
                     })
                     break
 
-            # Rule 3: Many subdomains (Medium: +2)
-            try:
-                from urllib.parse import urlparse
-                parsed = urlparse(url_lower)
-                host = parsed.netloc
-                parts = host.split('.')
-                if len(parts) > 3:
-                    total_score += 2
-                    triggered.append({
-                        'feature': 'Excessive Subdomains in URL',
-                        'severity': 'MEDIUM',
-                        'weight': 2
-                    })
-            except Exception:
-                pass
-
-            # Rule 4: Very long URL (Small: +1)
+            # Rule 9: Very long URL — Small (+1)
             if len(url) > 75:
-                total_score += 1
+                total += 1
                 triggered.append({
-                    'feature': 'Suspiciously Long URL (>75 chars)',
-                    'severity': 'SMALL',
-                    'weight': 1
+                    'feature_name': 'Suspiciously Long URL (>75 chars)',
+                    'severity': 'Small',
+                    'points': 1,
                 })
 
-            # Rule 5: Obfuscation (@, //, %xx) (Small: +1)
-            if '@' in url or '//' in url[7:] or re.search(r'%[0-9a-fA-F]{2}', url):
-                total_score += 1
-                triggered.append({
-                    'feature': 'URL Obfuscation (@, double-slash, %xx)',
-                    'severity': 'SMALL',
-                    'weight': 1
-                })
+        # Cap at 15
+        total = min(total, 15)
 
-            # Rule 6: HTTP on login/banking path (Small: +1)
-            if url_lower.startswith('http://') and re.search(
-                r'(login|signin|banking|account|secure|verify|update|confirm)', url_lower
-            ):
-                total_score += 1
-                triggered.append({
-                    'feature': 'HTTP (Insecure) on Sensitive Path',
-                    'severity': 'SMALL',
-                    'weight': 1
-                })
-
-            # Rule 7: Suspicious URL structure - combosquatting (Medium: +2)
-            if re.search(
-                r'(paypal|amazon|google|microsoft|apple|ebay|netflix|bank|secure)'
-                r'[-.]?(account|login|secure|update|verify|confirm)',
-                url_lower
-            ):
-                if not has_legitimate_domain:
-                    total_score += 2
-                    triggered.append({
-                        'feature': 'Suspicious URL Structure (Combosquatting)',
-                        'severity': 'MEDIUM',
-                        'weight': 2
-                    })
-
-        # --- Text-based rules ---
-
-        # Rule 8: Sensitive credential request (Big: +3)
-        for word in self.SENSITIVE_WORDS:
-            if word in text_lower:
-                total_score += 3
-                triggered.append({
-                    'feature': f'Direct Request for Sensitive Credentials ({word.title()})',
-                    'severity': 'BIG',
-                    'weight': 3
-                })
-                break  # only score once
-
-        # Rule 9: Threat or reward language (Big: +3)
-        for phrase in self.THREAT_REWARD_WORDS:
-            if phrase in text_lower:
-                total_score += 3
-                triggered.append({
-                    'feature': 'Threat or Reward Language Detected',
-                    'severity': 'BIG',
-                    'weight': 3
-                })
-                break
-
-        # Rule 10: Urgency words (Medium: +2)
-        for word in self.URGENCY_WORDS:
-            if word in text_lower:
-                total_score += 2
-                triggered.append({
-                    'feature': f'Urgency Language ("{word}")',
-                    'severity': 'MEDIUM',
-                    'weight': 2
-                })
-                break
-
-        # Rule 11: Time pressure (Small: +1)
-        for pattern in self.TIME_PRESSURE:
-            if re.search(pattern, text_lower):
-                total_score += 1
-                triggered.append({
-                    'feature': 'Time Pressure Language',
-                    'severity': 'SMALL',
-                    'weight': 1
-                })
-                break
-
-        # Rule 12: Generic click phrases (Small: +1)
-        for phrase in self.GENERIC_CLICK:
-            if phrase in text_lower:
-                total_score += 1
-                triggered.append({
-                    'feature': f'Generic Click Phrase ("{phrase.title()}")',
-                    'severity': 'SMALL',
-                    'weight': 1
-                })
-                break
-
-        # Rule 13: Generic greeting (Small: +1)
-        if re.search(r'\b(dear (customer|user|account holder|member|sir|madam|valued))\b', text_lower):
-            total_score += 1
-            triggered.append({
-                'feature': 'Generic Greeting (Dear Customer/User)',
-                'severity': 'SMALL',
-                'weight': 1
-            })
-
-        # Legitimate domain reduces impact slightly
-        if has_legitimate_domain and total_score > 0:
-            triggered.insert(0, {
-                'feature': 'Legitimate Domain Detected',
-                'severity': 'BIG',
-                'weight': 0
-            })
-
-        # Cap score
-        total_score = min(total_score, self.max_score)
-
-        # Determine label
-        if total_score >= 12:
+        if total >= 10:
             label = 'Confirmed Phishing'
-        elif total_score >= 6:
+        elif total >= 5:
             label = 'Suspicious'
         else:
             label = 'Safe'
 
         return {
-            'score': total_score,
-            'max_score': self.max_score,
+            'score': total,
+            'max_score': 15,
             'label': label,
-            'triggered_features': triggered
+            'triggered_features': triggered,
         }
