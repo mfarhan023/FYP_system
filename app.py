@@ -108,5 +108,13 @@ def delete_analysis(analysis_id):
     return redirect(url_for('history'))
 
 
+@app.route('/debug-score')
+def debug_score():
+    import json
+    test_text = "Congratulations! You are the lucky winner of our annual draw. Click the link to claim your prize immediately before it expires!"
+    h = heuristic_scorer.score(test_text, [])
+    return json.dumps(h, indent=2), 200, {'Content-Type': 'application/json'}
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
