@@ -170,25 +170,25 @@ class WeightedHeuristicScorer:
                 })
                 break  # only score once
 
-        # Rule 9: Threat or reward language (Medium: +2)
+        # Rule 9: Threat or reward language (Big: +3)
         for phrase in self.THREAT_REWARD_WORDS:
             if phrase in text_lower:
-                total_score += 2
+                total_score += 3
                 triggered.append({
                     'feature': 'Threat or Reward Language Detected',
-                    'severity': 'MEDIUM',
-                    'weight': 2
+                    'severity': 'BIG',
+                    'weight': 3
                 })
                 break
 
-        # Rule 10: Urgency words (Small: +1)
+        # Rule 10: Urgency words (Medium: +2)
         for word in self.URGENCY_WORDS:
             if word in text_lower:
-                total_score += 1
+                total_score += 2
                 triggered.append({
                     'feature': f'Urgency Language ("{word}")',
-                    'severity': 'SMALL',
-                    'weight': 1
+                    'severity': 'MEDIUM',
+                    'weight': 2
                 })
                 break
 
