@@ -1,5 +1,6 @@
 import os
 import io
+from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session
 from dotenv import load_dotenv
 from analyzer_engine import AnalyzerEngine
@@ -16,6 +17,58 @@ engine = AnalyzerEngine()
 heuristic_scorer = WeightedHeuristicScorer()
 logger = DbLogger()
 
+
+# ── Admin Auth Helper ──────────────────────────────────────────────────────────
+
+def admin_required(f):
+    """Decorator: return 404 silently if not authenticated as admin.
+    Regular users see no indication that an admin panel exists.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('is_admin'):
+            return render_template('404.html'), 404
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ── Admin Auth Routes ──────────────────────────────────────────────────────────
+
+# Secret admin URL — not linked anywhere in the UI.
+# Only the admin knows this URL exists.
+@app.route('/ezveri-ctrl-2024', methods=['GET', 'POST'])
+def admin_login():
+    # Already logged in — redirect to history
+    if session.get('is_admin'):
+        return redirect(url_for('history'))
+
+    error = None
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        admin_pw = os.environ.get('ADMIN_PASSWORD', 'admin1234')
+        if password == admin_pw:
+            session['is_admin'] = True
+            flash('Logged in as Admin.', 'success')
+            return redirect(url_for('history'))
+        else:
+            error = 'Incorrect password. Please try again.'
+
+    return render_template('admin_login.html', error=error)
+
+
+@app.route('/ezveri-ctrl-2024/logout')
+def admin_logout():
+    session.pop('is_admin', None)
+    flash('Logged out from admin session.', 'success')
+    return redirect(url_for('index'))
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+
+# ── Public Routes ──────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
@@ -78,7 +131,10 @@ def result(analysis_id):
     return redirect(url_for('index'))
 
 
+# ── Admin-Only Routes ──────────────────────────────────────────────────────────
+
 @app.route('/history')
+@admin_required
 def history():
     analyses = logger.get_all_analyses()
     stats = logger.get_stats()
@@ -86,6 +142,7 @@ def history():
 
 
 @app.route('/export')
+@admin_required
 def export():
     content = logger.export_csv_content()
     if not content:
@@ -100,6 +157,7 @@ def export():
 
 
 @app.route('/delete/<int:analysis_id>', methods=['POST'])
+@admin_required
 def delete_analysis(analysis_id):
     try:
         logger.delete_analysis(analysis_id)
