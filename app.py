@@ -15,7 +15,12 @@ app.secret_key = os.environ.get('SECRET_KEY', 'ezveri-phish-secret-2024')
 
 engine = AnalyzerEngine()
 heuristic_scorer = WeightedHeuristicScorer()
-logger = DbLogger()
+try:
+    logger = DbLogger()
+except Exception as _db_err:
+    import sys
+    print(f"[STARTUP ERROR] DbLogger failed: {_db_err}", file=sys.stderr)
+    logger = None
 
 
 # ── Admin Auth Helper ──────────────────────────────────────────────────────────
@@ -75,6 +80,22 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/debug-env')
+def debug_env():
+    """Temporary debug route — shows env var status and DB connectivity. Remove after fix."""
+    import sys
+    db_url = os.environ.get('DATABASE_URL', '')
+    db_status = 'logger is None (failed to init)' if logger is None else 'logger OK'
+    return {
+        'DATABASE_URL': 'SET' if db_url else 'MISSING',
+        'DATABASE_URL_prefix': db_url[:30] + '...' if db_url else '',
+        'SECRET_KEY': 'SET' if os.environ.get('SECRET_KEY') else 'MISSING',
+        'ADMIN_PASSWORD': 'SET' if os.environ.get('ADMIN_PASSWORD') else 'MISSING',
+        'db_logger_status': db_status,
+        'python_version': sys.version,
+    }
+
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
     email_text = request.form.get('email_content', '').strip()
@@ -104,6 +125,10 @@ def analyze():
         result['heuristic_score']    = None
         result['triggered_features'] = []
     # ───────────────────────────────────────────────────────────────────
+
+    if logger is None:
+        flash('Database not configured. Please contact the administrator.', 'error')
+        return redirect(url_for('index'))
 
     analysis_id = logger.log_result(result)
     result['id'] = analysis_id
