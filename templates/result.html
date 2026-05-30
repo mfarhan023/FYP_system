@@ -167,7 +167,9 @@
     <!-- Actions -->
     <div class="result-actions">
         <a href="{{ url_for('index') }}" class="btn-primary">🔍 Analyze Another Email</a>
+        {% if session.get('is_admin') %}
         <a href="{{ url_for('history') }}" class="btn-secondary">📋 View History</a>
+        {% endif %}
     </div>
 
 </section>
