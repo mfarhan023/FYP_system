@@ -54,7 +54,7 @@
                 <tbody>
                     {% for a in analyses %}
                     <tr>
-                        <td class="td-id">{{ a.id }}</td>
+                        <td class="td-id">{{ loop.revindex }}</td>
                         <td class="td-ts">{{ a.timestamp }}</td>
                         <td>
                             {% if a.label == 'Confirmed Phishing' %}
