@@ -26,6 +26,10 @@
             <div class="stat-number">{{ stats.confirmed }}</div>
             <div class="stat-label">Confirmed Phishing</div>
         </div>
+        <div class="stat-card stat-warning">
+            <div class="stat-number">{{ stats.suspicious }}</div>
+            <div class="stat-label">Suspicious</div>
+        </div>
         <div class="stat-card stat-success">
             <div class="stat-number">{{ stats.safe }}</div>
             <div class="stat-label">Safe</div>
@@ -59,6 +63,8 @@
                         <td>
                             {% if a.label == 'Confirmed Phishing' %}
                             <span class="label-badge label-danger">🚨 Confirmed Phishing</span>
+                            {% elif a.label == 'Suspicious' %}
+                            <span class="label-badge label-warning">⚠️ Suspicious</span>
                             {% else %}
                             <span class="label-badge label-success">✅ Safe</span>
                             {% endif %}

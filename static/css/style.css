@@ -565,6 +565,7 @@ main { flex: 1; }
 }
 .stat-card:hover { transform: translateY(-2px); }
 .stat-danger { border-top: 3px solid var(--danger); }
+.stat-warning { border-top: 3px solid var(--warning); }
 .stat-success { border-top: 3px solid var(--success); }
 .stat-number { font-size: 2.2rem; font-weight: 800; letter-spacing: -1px; }
 .stat-label  { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
@@ -607,6 +608,7 @@ main { flex: 1; }
   white-space: nowrap;
 }
 .label-danger  { background: var(--danger-bg); color: #991b1b; border: 1px solid var(--danger-border); }
+.label-warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
 .label-success { background: var(--success-bg); color: #065f46; border: 1px solid var(--success-border); }
 .action-btn {
   display: inline-flex;
