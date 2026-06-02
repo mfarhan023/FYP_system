@@ -70,6 +70,7 @@ class WeightedHeuristicScorer:
         '.xyz', '.tk', '.ml', '.ga', '.cf', '.gq',
         '.ru', '.cn', '.pw', '.top', '.club', '.info',
         '.biz', '.link', '.click', '.download', '.zip',
+        '.id',
     ]
 
     # [B] Legitimate indicators — reduce score (negative weights)
