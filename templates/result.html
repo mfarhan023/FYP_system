@@ -36,7 +36,6 @@
             </div>
             {% endif %}
 
-            <h1 class="result-title">Threat Intelligence Report</h1>
             <p class="result-subtitle">
                 {% if result.label == 'Confirmed Phishing' %}
                 ⚠️ <strong>{{ result.blacklisted_count }} URL{{ 's' if result.blacklisted_count != 1 else '' }}</strong>
