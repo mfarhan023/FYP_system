@@ -87,7 +87,7 @@ class AnalyzerEngine:
                     'phishtank_status': 'NOT LISTED',
                 })
 
-        label = 'Confirmed Phishing' if any_blacklisted else 'Safe'
+        label = 'Confirmed Phishing' if any_blacklisted else 'Low Risk'
 
         return {
             'label': label,

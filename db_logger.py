@@ -55,6 +55,13 @@ class DbLogger:
                         c.execute(f'ALTER TABLE analysis_log ADD COLUMN IF NOT EXISTS {col} {coltype}')
                     except Exception:
                         pass
+
+                # Migration: update 'Safe' labels to 'Low Risk'
+                try:
+                    c.execute("UPDATE analysis_log SET label = 'Low Risk' WHERE label = 'Safe'")
+                    c.execute("UPDATE analysis_log SET heuristic_label = 'Low Risk' WHERE heuristic_label = 'Safe'")
+                except Exception:
+                    pass
             conn.commit()
 
     def log_result(self, result: dict) -> int:
@@ -130,7 +137,7 @@ class DbLogger:
                 total = c.fetchone()[0]
                 c.execute("SELECT COUNT(*) FROM analysis_log WHERE label = 'Confirmed Phishing'")
                 confirmed = c.fetchone()[0]
-                c.execute("SELECT COUNT(*) FROM analysis_log WHERE label = 'Safe'")
+                c.execute("SELECT COUNT(*) FROM analysis_log WHERE label = 'Low Risk'")
                 safe = c.fetchone()[0]
                 c.execute("SELECT COUNT(*) FROM analysis_log WHERE label = 'Suspicious'")
                 suspicious = c.fetchone()[0]

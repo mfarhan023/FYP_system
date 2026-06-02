@@ -289,7 +289,7 @@ class WeightedHeuristicScorer:
         if total >= 4:
             label = 'Suspicious'
         else:
-            label = 'Safe'
+            label = 'Low Risk'
 
         return {
             'score': total,

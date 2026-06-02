@@ -37,6 +37,10 @@ class SQLiteLogger:
                     FOREIGN KEY (analysis_id) REFERENCES analysis_log(id)
                 )
             ''')
+            try:
+                c.execute("UPDATE analysis_log SET label = 'Low Risk' WHERE label = 'Safe'")
+            except Exception:
+                pass
             conn.commit()
 
     def log_result(self, result: dict) -> int:
@@ -99,7 +103,7 @@ class SQLiteLogger:
             total = c.fetchone()[0]
             c.execute("SELECT COUNT(*) FROM analysis_log WHERE label = 'Confirmed Phishing'")
             confirmed = c.fetchone()[0]
-            c.execute("SELECT COUNT(*) FROM analysis_log WHERE label = 'Safe'")
+            c.execute("SELECT COUNT(*) FROM analysis_log WHERE label = 'Low Risk'")
             safe = c.fetchone()[0]
         return {'total': total, 'confirmed': confirmed, 'safe': safe}
 
