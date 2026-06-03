@@ -67,7 +67,7 @@
     {% if result.heuristic_score is not none and result.heuristic_score != None %}
     <div class="card" style="margin-top: 2rem;">
         <div class="card-header">
-            <h2>🧠 Heuristic Risk Score</h2>
+            <h2>🧠 Heuristic Score</h2>
             {% if session.get('is_admin') %}
             <span class="badge-pill
                 {% if result.heuristic_score >= 9 %}badge-pill-danger
