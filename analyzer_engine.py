@@ -1,6 +1,9 @@
 import re
 import os
 import psycopg2
+import urllib.request
+import urllib.parse
+import json
 from urllib.parse import urlparse
 
 
@@ -52,6 +55,33 @@ class AnalyzerEngine:
 
         return False
 
+    def _check_url_via_api(self, url: str) -> bool:
+        """
+        Check a single URL against the PhishTank API in real-time.
+        """
+        api_url = "https://checkurl.phishtank.com/checkurl/"
+        params = {
+            'url': url,
+            'format': 'json',
+        }
+        try:
+            data = urllib.parse.urlencode(params).encode('utf-8')
+            # User-Agent is required by PhishTank API to prevent blocking
+            req = urllib.request.Request(
+                api_url,
+                data=data,
+                headers={'User-Agent': 'phishtank/FYP_system'}
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status == 200:
+                    res_data = response.read().decode('utf-8')
+                    result = json.loads(res_data)
+                    results = result.get('results', {})
+                    return results.get('in_database', False) and results.get('verified', False) and results.get('valid', False)
+        except Exception as e:
+            print(f"[PhishTank API Error] {e}")
+        return False
+
     def analyze(self, email_text: str) -> dict:
         """
         Analyze email text against the Supabase blacklist.
@@ -67,6 +97,10 @@ class AnalyzerEngine:
                 with conn.cursor() as cur:
                     for url in urls:
                         is_bl = self._check_url(url, cur)
+                        # Fallback to PhishTank API check if not found in local DB
+                        if not is_bl:
+                            is_bl = self._check_url_via_api(url)
+                        
                         if is_bl:
                             any_blacklisted = True
                         url_evidence.append({
@@ -78,13 +112,16 @@ class AnalyzerEngine:
             finally:
                 conn.close()
         else:
-            # No DB connection available — classify all URLs as not listed
+            # No DB connection available — fallback to API checking directly
             for url in urls:
+                is_bl = self._check_url_via_api(url)
+                if is_bl:
+                    any_blacklisted = True
                 url_evidence.append({
                     'url': url,
-                    'blacklisted': False,
+                    'blacklisted': is_bl,
                     'display': url[:55] + '...' if len(url) > 55 else url,
-                    'phishtank_status': 'NOT LISTED',
+                    'phishtank_status': 'MALICIOUS' if is_bl else 'NOT LISTED',
                 })
 
         label = 'Confirmed Phishing' if any_blacklisted else 'Low Risk'
