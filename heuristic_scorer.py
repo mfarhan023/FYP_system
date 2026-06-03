@@ -73,22 +73,6 @@ class WeightedHeuristicScorer:
         '.id',
     ]
 
-    # [B] Legitimate indicators — reduce score (negative weights)
-    LEGITIMATE_INDICATORS = [
-        ('unsubscribe', -2),
-        ('privacy policy', -2),
-        ('terms and conditions', -2),
-        ('terms of service', -2),
-        ('do not reply', -1),
-        ('this is an automated', -1),
-        ('sent from our office', -2),
-        ('©', -1),
-        ('all rights reserved', -1),
-        ('contact us at', -1),
-        ('if you did not request', -2),
-        ('you are receiving this', -1),
-    ]
-
     def score(self, email_text: str, urls: list) -> dict:
         text = email_text.lower()
         total = 0
@@ -248,37 +232,6 @@ class WeightedHeuristicScorer:
                     'severity': 'Small',
                     'points': 1,
                 })
-
-            # [C] Rule 13: Brand name in subdomain abuse (e.g. paypal.evil.com) — Big (+3)
-            BRAND_NAMES = ['paypal', 'amazon', 'google', 'microsoft', 'apple',
-                           'facebook', 'netflix', 'ebay', 'instagram', 'whatsapp',
-                           'maybank', 'cimb', 'rhb', 'bankrakyat', 'bnm']
-            parts = domain.split('.')
-            # If brand name appears in subdomain part (not the actual domain)
-            if len(parts) > 2:
-                subdomain_part = '.'.join(parts[:-2])
-                for brand in BRAND_NAMES:
-                    if brand in subdomain_part:
-                        total += 3
-                        triggered.append({
-                            'feature_name': f'Brand Name "{brand}" Spoofed in Subdomain',
-                            'severity': 'Big',
-                            'points': 3,
-                        })
-                        break
-
-        # ── NEGATIVE RULES (Legitimate Indicators) ───────────────────────
-
-        # [B] Subtract points for signs of legitimate email
-        for phrase, penalty in self.LEGITIMATE_INDICATORS:
-            if phrase in text:
-                total += penalty  # penalty is already negative
-                triggered.append({
-                    'feature_name': f'Legitimate Indicator: "{phrase}"',
-                    'severity': 'Negative',
-                    'points': penalty,
-                })
-
         # ── FINAL SCORING ─────────────────────────────────────────────────
 
         # Ensure score doesn't go below 0
