@@ -68,12 +68,14 @@
     <div class="card" style="margin-top: 2rem;">
         <div class="card-header">
             <h2>🧠 Heuristic Risk Score</h2>
+            {% if session.get('is_admin') %}
             <span class="badge-pill
                 {% if result.heuristic_score >= 9 %}badge-pill-danger
                 {% elif result.heuristic_score >= 4 %}badge-pill-warning
                 {% else %}badge-pill-safe{% endif %}">
                 {{ result.heuristic_score }}
             </span>
+            {% endif %}
         </div>
 
         {% if result.triggered_features %}
@@ -91,9 +93,11 @@
                         <div class="url-status" style="color: var(--text-muted);">Severity: {{ feature.severity }}</div>
                     </div>
                 </div>
+                {% if session.get('is_admin') %}
                 <span class="label-badge {% if feature.severity == 'Big' %}label-danger{% elif feature.severity == 'Medium' %}label-warning{% else %}label-neutral{% endif %}">
                     +{{ feature.points }} pts
                 </span>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
