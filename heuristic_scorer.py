@@ -281,8 +281,8 @@ class WeightedHeuristicScorer:
 
         # ── FINAL SCORING ─────────────────────────────────────────────────
 
-        # Ensure score doesn't go below 0 or above 15
-        total = max(0, min(total, 15))
+        # Ensure score doesn't go below 0
+        total = max(0, total)
 
         # This scorer only returns 'Suspicious' or 'Safe'.
         # 'Confirmed Phishing' is exclusively assigned when PhishTank blacklist matches.
@@ -293,7 +293,6 @@ class WeightedHeuristicScorer:
 
         return {
             'score': total,
-            'max_score': 15,
             'label': label,
             'triggered_features': triggered,
         }
