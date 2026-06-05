@@ -18,7 +18,7 @@ class WeightedHeuristicScorer:
     """
 
     REWARD_PHRASES = [
-        'congratulations', 'lucky winner', 'you have won', "you've won",
+        'lucky winner', 'you have won', "you've won",
         'prize', 'reward', 'lottery', 'selected winner', 'unclaimed funds',
         'million dollar', 'inheritance', 'cash prize', 'gift card',
         'free offer', 'exclusive offer', 'claim your',
