@@ -1,7 +1,9 @@
 import os
 import io
 from functools import wraps
+# pyrefly: ignore [missing-import]
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session
+from flask_cors import CORS
 from dotenv import load_dotenv
 from analyzer_engine import AnalyzerEngine
 from heuristic_scorer import WeightedHeuristicScorer
@@ -11,6 +13,7 @@ from db_logger import DbLogger
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 app.secret_key = os.environ.get('SECRET_KEY', 'ezveri-phish-secret-2024')
 
 engine = AnalyzerEngine()
@@ -136,6 +139,51 @@ def analyze():
     return redirect(url_for('result', analysis_id=analysis_id))
 
 
+@app.route('/api/analyze', methods=['POST'])
+def api_analyze():
+    # Accept JSON or form data
+    if request.is_json:
+        data = request.get_json() or {}
+        email_text = data.get('email_content', '').strip()
+    else:
+        email_text = request.form.get('email_content', '').strip()
+
+    if not email_text:
+        return {'status': 'error', 'message': 'Please provide email content to analyze.'}, 400
+    if len(email_text) < 5:
+        return {'status': 'error', 'message': 'Content is too short. Please provide more text.'}, 400
+
+    result = engine.analyze(email_text)
+
+    # Heuristic fallback
+    if result['blacklisted_count'] == 0:
+        heuristic = heuristic_scorer.score(email_text, result['urls_found'])
+        result['heuristic_label']     = heuristic['label']
+        result['heuristic_score']     = heuristic['score']
+        result['triggered_features']  = heuristic['triggered_features']
+        if heuristic['label'] in ('Suspicious', 'Confirmed Phishing'):
+            result['label'] = 'Suspicious'
+    else:
+        result['heuristic_label']    = None
+        result['heuristic_score']    = None
+        result['triggered_features'] = []
+
+    analysis_id = None
+    if logger is not None:
+        try:
+            analysis_id = logger.log_result(result)
+        except Exception as log_err:
+            import sys
+            print(f"[API ERROR] Failed to log result: {log_err}", file=sys.stderr)
+
+    result['id'] = analysis_id
+    
+    return {
+        'status': 'success',
+        'result': result
+    }
+
+
 @app.route('/result/<int:analysis_id>')
 def result(analysis_id):
     stored = logger.get_analysis_by_id(analysis_id)
@@ -190,6 +238,27 @@ def delete_analysis(analysis_id):
     except Exception as e:
         flash(f'Error: {e}', 'error')
     return redirect(url_for('history'))
+
+
+@app.route('/delete-bulk', methods=['POST'])
+@admin_required
+def delete_bulk():
+    selected_ids = request.form.getlist('selected_ids')
+    if not selected_ids:
+        flash('No records selected.', 'warning')
+        return redirect(url_for('history'))
+
+    deleted_count = 0
+    try:
+        for str_id in selected_ids:
+            analysis_id = int(str_id)
+            logger.delete_analysis(analysis_id)
+            deleted_count += 1
+        flash(f'Successfully deleted {deleted_count} records.', 'success')
+    except Exception as e:
+        flash(f'Error during bulk deletion: {e}', 'error')
+    return redirect(url_for('history'))
+
 
 
 if __name__ == '__main__':

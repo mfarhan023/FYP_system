@@ -42,14 +42,32 @@ class AnalyzerEngine:
 
         # 2. Domain-level match
         try:
-            domain = urlparse(normalized).netloc
+            domain = urlparse(normalized).netloc.lower()
             if domain:
+                # Strip leading 'www.' if present
+                base_domain = domain[4:] if domain.startswith('www.') else domain
                 cursor.execute(
-                    "SELECT 1 FROM blacklist WHERE url LIKE %s LIMIT 1",
-                    (f'%{domain}%',)
+                    "SELECT url FROM blacklist WHERE url LIKE %s LIMIT 100",
+                    (f'%{base_domain}%',)
                 )
-                if cursor.fetchone():
-                    return True
+                rows = cursor.fetchall()
+                for row in rows:
+                    bl_url = row[0].strip().lower()
+                    try:
+                        parsed_bl = urlparse(bl_url)
+                        bl_domain = parsed_bl.netloc.lower()
+                        if bl_domain:
+                            # Skip page-specific blocks (containing paths or queries) for domain-wide checks
+                            # to prevent blocking shared platforms like bit.ly, drive.google.com, etc.
+                            if parsed_bl.path.strip('/') or parsed_bl.query:
+                                continue
+
+                            bl_base = bl_domain[4:] if bl_domain.startswith('www.') else bl_domain
+                            # Check for exact match or subdomain relationship
+                            if bl_base == base_domain or bl_base.endswith('.' + base_domain) or base_domain.endswith('.' + bl_base):
+                                return True
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -132,6 +150,6 @@ class AnalyzerEngine:
             'url_evidence': url_evidence,
             'url_count': len(urls),
             'blacklisted_count': sum(1 for u in url_evidence if u['blacklisted']),
-            'email_preview': email_text[:200].strip(),
+            'email_preview': email_text.strip(),
         }
 
