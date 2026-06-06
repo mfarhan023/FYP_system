@@ -1,7 +1,8 @@
 import os
 import io
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session
+# pyrefly: ignore [missing-import]
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session, jsonify
 from dotenv import load_dotenv
 from analyzer_engine import AnalyzerEngine
 from heuristic_scorer import WeightedHeuristicScorer
@@ -12,6 +13,13 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'ezveri-phish-secret-2024')
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+    return response
 
 engine = AnalyzerEngine()
 heuristic_scorer = WeightedHeuristicScorer()
@@ -134,6 +142,46 @@ def analyze():
     result['id'] = analysis_id
     session['last_result'] = result
     return redirect(url_for('result', analysis_id=analysis_id))
+
+
+@app.route('/api/analyze', methods=['POST', 'OPTIONS'])
+def api_analyze():
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.get_json(silent=True) or {}
+    email_text = data.get('email_content', '').strip()
+
+    if not email_text:
+        return jsonify({'status': 'error', 'message': 'No email content provided.'}), 400
+    if len(email_text) < 5:
+        return jsonify({'status': 'error', 'message': 'Content is too short.'}), 400
+
+    result = engine.analyze(email_text)
+
+    if result['blacklisted_count'] == 0:
+        heuristic = heuristic_scorer.score(email_text, result['urls_found'])
+        result['heuristic_label']     = heuristic['label']
+        result['heuristic_score']     = heuristic['score']
+        result['triggered_features']  = heuristic['triggered_features']
+        if heuristic['label'] in ('Suspicious', 'Confirmed Phishing'):
+            result['label'] = 'Suspicious'
+    else:
+        result['heuristic_label']    = None
+        result['heuristic_score']    = None
+        result['triggered_features'] = []
+
+    if logger:
+        try:
+            analysis_id = logger.log_result(result)
+            result['id'] = analysis_id
+        except Exception as e:
+            print(f"[API Error] Failed to log result: {e}")
+
+    return jsonify({
+        'status': 'success',
+        'result': result
+    })
 
 
 @app.route('/result/<int:analysis_id>')

@@ -4,73 +4,61 @@ from urllib.parse import urlparse
 
 class WeightedHeuristicScorer:
     """
-    Weighted heuristic scoring for phishing email detection.
-    Thresholds: score >= 4 → Suspicious, else → Safe
+    Priority-based heuristic scoring for phishing email detection.
+    Evaluates 13 text-based and URL-based rules.
+    Each rule triggers at most once.
+
+    Severity to Priority Values:
+    - Big = 4
+    - Medium = 2
+    - Small = 1
+
+    Threshold:
+    - score >= 4 -> Suspicious
+    - score < 4 -> Low Risk
 
     NOTE: This scorer NEVER returns 'Confirmed Phishing'.
     'Confirmed Phishing' is reserved exclusively for PhishTank blacklist matches.
-
-    Improvements:
-    - All phrase matches are counted (not just first match), capped per category
-    - Legitimate email indicators reduce the score (negative weights)
-    - Additional URL-based rules (TLD, hyphen count, http, subdomain abuse)
-    - Adjusted thresholds for better precision & recall
     """
 
+    # --- Rule 1 to 6 Phrases ---
+    SENSITIVE_PHRASES = [
+        'password', 'credit card', 'bank account', 'otp', 'pin', 'cvv',
+        'login credentials', 'identity verification', 'private information'
+    ]
+
     REWARD_PHRASES = [
-        'lucky winner', 'you have won', "you've won",
-        'prize', 'reward', 'lottery', 'selected winner', 'unclaimed funds',
-        'million dollar', 'inheritance', 'cash prize', 'gift card',
-        'free offer', 'exclusive offer', 'claim your',
+        'congratulations', 'lucky winner', 'prize', 'reward', 'lottery',
+        'gift card', 'free offer', 'claim your'
     ]
 
     THREAT_PHRASES = [
-        'account will be', 'account suspended', 'account blocked',
-        'account deleted', 'account terminated', 'legal action',
-        'unauthorized access', 'suspicious activity detected',
-        'account has been compromised', 'your account will be closed',
-        'failure to comply', 'law enforcement', 'arrested',
+        'account suspended', 'account blocked', 'legal action',
+        'suspicious activity detected', 'account compromised', 'account closed'
     ]
 
     URGENCY_PHRASES = [
-        'immediately', 'urgent', 'act now', 'action required',
-        'expires', 'expiring', 'respond now', 'respond immediately',
-        'final notice', 'last warning', 'limited time', 'do not delay',
-        'asap', 'right away', 'without delay', 'time-sensitive',
+        'urgent', 'act now', 'action required', 'final notice',
+        'last warning', 'limited time', 'do not delay'
     ]
 
-    TIME_PRESSURE_PATTERNS = [
-        r'within \d+ hours?', r'within \d+ days?', r'in \d+ hours?',
-        r'24 hours?', r'48 hours?', r'before .{0,30} expires?',
-        r'ends? today', r'last chance', r'deadline',
-        r'expires? in \d+', r'only \d+ (hours?|minutes?) left',
-    ]
-
-    SENSITIVE_PHRASES = [
-        'password', 'credit card', 'bank account', 'otp',
-        'one-time password', 'pin number', 'cvv', 'ssn',
-        'social security', 'banking details', 'login credentials',
-        'mother\'s maiden name', 'date of birth', 'security question',
-        'verify your identity', 'confirm your details',
+    TIME_PRESSURE_PHRASES = [
+        'within 24 hours', '48 hours', 'last chance', 'deadline',
+        'ends today', 'only a few hours left'
     ]
 
     CLICK_PHRASES = [
-        'click here', 'click the link', 'click below',
-        'follow this link', 'tap here', 'open the link', 'visit this link',
-        'access your account here', 'login here', 'sign in here',
+        'click here', 'click the link', 'click below', 'tap here',
+        'login here', 'sign in here'
     ]
 
+    # --- URL Rules Config ---
     URL_SHORTENERS = [
-        'bit.ly', 'tinyurl', 'goo.gl', 'ow.ly', 't.co',
-        'buff.ly', 'is.gd', 'rb.gy', 'cutt.ly', 'tiny.cc',
-        'shorturl.at', 'clck.ru', 'su.pr', 'adf.ly',
+        'bit.ly', 'tinyurl', 'goo.gl', 'ow.ly', 't.co', 'rb.gy', 'cutt.ly', 'shorturl.at'
     ]
 
     SUSPICIOUS_TLDS = [
-        '.xyz', '.tk', '.ml', '.ga', '.cf', '.gq',
-        '.ru', '.cn', '.pw', '.top', '.club', '.info',
-        '.biz', '.link', '.click', '.download', '.zip',
-        '.id',
+        '.xyz', '.tk', '.ru', '.cn', '.top', '.club', '.info', '.biz', '.click', '.download', '.zip', '.id'
     ]
 
     def score(self, email_text: str, urls: list) -> dict:
@@ -78,86 +66,72 @@ class WeightedHeuristicScorer:
         total = 0
         triggered = []
 
-        # ── POSITIVE RULES ────────────────────────────────────────────────
+        # ── TEXT-BASED RULES ──────────────────────────────────────────────
 
-        # Rule 1: Sensitive info request — count all matches, cap at 3, Big (+5 each)
-        sensitive_matches = [p for p in self.SENSITIVE_PHRASES if p in text]
-        if sensitive_matches:
-            count = min(len(sensitive_matches), 3)
-            pts = count * 5
-            total += pts
+        # Rule 1: Sensitive Information Request (Big = 4)
+        if any(p in text for p in self.SENSITIVE_PHRASES):
+            total += 4
             triggered.append({
-                'feature_name': f'Sensitive Info Request ({count} match{"es" if count > 1 else ""}): '
-                                + ', '.join(f'"{m}"' for m in sensitive_matches[:3]),
+                'feature_name': 'Sensitive Information Request',
                 'severity': 'Big',
-                'points': pts,
+                'priority_value': 4
             })
 
-        # Rule 2: Reward / prize language — count all matches, cap at 2, Big (+4 each)
-        reward_matches = [p for p in self.REWARD_PHRASES if p in text]
-        if reward_matches:
-            count = min(len(reward_matches), 2)
-            pts = count * 4
-            total += pts
+        # Rule 2: Reward or Prize Language (Medium = 2)
+        if any(p in text for p in self.REWARD_PHRASES):
+            total += 2
             triggered.append({
-                'feature_name': f'Reward or Prize Language ({count} match{"es" if count > 1 else ""}): '
-                                + ', '.join(f'"{m}"' for m in reward_matches[:2]),
-                'severity': 'Big',
-                'points': pts,
-            })
-
-        # Rule 3: Threat language — count all matches, cap at 3, Medium (+3 each)
-        threat_matches = [p for p in self.THREAT_PHRASES if p in text]
-        if threat_matches:
-            count = min(len(threat_matches), 3)
-            pts = count * 3
-            total += pts
-            triggered.append({
-                'feature_name': f'Threat Language ({count} match{"es" if count > 1 else ""}): '
-                                + ', '.join(f'"{m}"' for m in threat_matches[:3]),
+                'feature_name': 'Reward or Prize Language',
                 'severity': 'Medium',
-                'points': pts,
+                'priority_value': 2
             })
 
-        # Rule 4: Urgency words — count all matches, cap at 3, Medium (+2 each)
-        urgency_matches = [p for p in self.URGENCY_PHRASES if p in text]
-        if urgency_matches:
-            count = min(len(urgency_matches), 3)
-            pts = count * 2
-            total += pts
+        # Rule 3: Threat Language (Medium = 2)
+        if any(p in text for p in self.THREAT_PHRASES):
+            total += 2
             triggered.append({
-                'feature_name': f'Urgency Language ({count} match{"es" if count > 1 else ""}): '
-                                + ', '.join(f'"{m}"' for m in urgency_matches[:3]),
+                'feature_name': 'Threat Language',
                 'severity': 'Medium',
-                'points': pts,
+                'priority_value': 2
             })
 
-        # Rule 5: Time pressure — count all patterns, cap at 2, Small (+1 each)
-        time_matches = [p for p in self.TIME_PRESSURE_PATTERNS if re.search(p, text)]
-        if time_matches:
-            count = min(len(time_matches), 2)
-            pts = count * 1
-            total += pts
+        # Rule 4: Urgency Language (Medium = 2)
+        if any(p in text for p in self.URGENCY_PHRASES):
+            total += 2
             triggered.append({
-                'feature_name': f'Time Pressure Language ({count} pattern{"s" if count > 1 else ""})',
-                'severity': 'Small',
-                'points': pts,
+                'feature_name': 'Urgency Language',
+                'severity': 'Medium',
+                'priority_value': 2
             })
 
-        # Rule 6: Generic click phrases — count all matches, cap at 2, Small (+1 each)
-        click_matches = [p for p in self.CLICK_PHRASES if p in text]
-        if click_matches:
-            count = min(len(click_matches), 2)
-            pts = count * 1
-            total += pts
+        # Rule 5: Time Pressure Language (Small = 1)
+        if any(p in text for p in self.TIME_PRESSURE_PHRASES):
+            total += 1
             triggered.append({
-                'feature_name': f'Generic Click Phrase ({count} match{"es" if count > 1 else ""}): '
-                                + ', '.join(f'"{m}"' for m in click_matches[:2]),
+                'feature_name': 'Time Pressure Language',
                 'severity': 'Small',
-                'points': pts,
+                'priority_value': 1
+            })
+
+        # Rule 6: Generic Click Phrase (Small = 1)
+        if any(p in text for p in self.CLICK_PHRASES):
+            total += 1
+            triggered.append({
+                'feature_name': 'Generic Click Phrase',
+                'severity': 'Small',
+                'priority_value': 1
             })
 
         # ── URL-BASED RULES ───────────────────────────────────────────────
+
+        # Pre-process domains and URL traits
+        has_ip_rule = False
+        has_shortener_rule = False
+        has_suspicious_tld_rule = False
+        has_many_hyphens_rule = False
+        has_excessive_hyphens_rule = False
+        has_long_url_rule = False
+        has_insecure_http_rule = False
 
         for url in urls:
             url_lower = url.lower()
@@ -167,78 +141,94 @@ class WeightedHeuristicScorer:
             except Exception:
                 domain = ''
 
-            # Rule 7: IP address in URL — Big (+4)
-            if re.search(r'https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', url_lower):
-                total += 4
-                triggered.append({
-                    'feature_name': 'IP Address in URL',
-                    'severity': 'Big',
-                    'points': 4,
-                })
+            # Rule 7: IP Address in URL (Big = 4)
+            if not has_ip_rule and re.search(r'https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', url_lower):
+                has_ip_rule = True
 
-            # Rule 8: URL shortener — Medium (+2)
-            for shortener in self.URL_SHORTENERS:
-                if shortener in url_lower:
-                    total += 2
-                    triggered.append({
-                        'feature_name': f'URL Shortener ({shortener})',
-                        'severity': 'Medium',
-                        'points': 2,
-                    })
-                    break
+            # Rule 8: URL Shortener (Medium = 2)
+            if not has_shortener_rule and any(shortener in url_lower for shortener in self.URL_SHORTENERS):
+                has_shortener_rule = True
 
-            # Rule 9: Very long URL — Small (+1)
-            if len(url) > 75:
-                total += 1
-                triggered.append({
-                    'feature_name': 'Suspiciously Long URL (>75 chars)',
-                    'severity': 'Small',
-                    'points': 1,
-                })
+            # Rule 9: Suspicious TLD (Medium = 2)
+            if not has_suspicious_tld_rule and any(domain.endswith(tld) or (tld + '/') in url_lower for tld in self.SUSPICIOUS_TLDS):
+                has_suspicious_tld_rule = True
 
-            # [C] Rule 10: Insecure HTTP (not HTTPS) — Small (+1)
-            if url_lower.startswith('http://'):
-                total += 1
-                triggered.append({
-                    'feature_name': 'Insecure HTTP URL (not HTTPS)',
-                    'severity': 'Small',
-                    'points': 1,
-                })
-
-            # [C] Rule 11: Suspicious TLD — Medium (+2)
-            for tld in self.SUSPICIOUS_TLDS:
-                if domain.endswith(tld) or (tld + '/') in url_lower:
-                    total += 2
-                    triggered.append({
-                        'feature_name': f'Suspicious TLD ({tld})',
-                        'severity': 'Medium',
-                        'points': 2,
-                    })
-                    break
-
-            # [C] Rule 12: Too many hyphens in domain (e.g. secure-login-paypal-verify.com) — Medium (+2)
+            # Rule 10 & 11: Hyphen rules
             hyphen_count = domain.split('/')[0].count('-')
-            if hyphen_count >= 3:
-                total += 2
-                triggered.append({
-                    'feature_name': f'Suspicious Domain with {hyphen_count} Hyphens',
-                    'severity': 'Medium',
-                    'points': 2,
-                })
-            elif hyphen_count == 2:
-                total += 1
-                triggered.append({
-                    'feature_name': f'Domain with {hyphen_count} Hyphens',
-                    'severity': 'Small',
-                    'points': 1,
-                })
+            if hyphen_count == 2:
+                has_many_hyphens_rule = True
+            elif hyphen_count >= 3:
+                has_excessive_hyphens_rule = True
+
+            # Rule 12: Suspiciously Long URL (Small = 1)
+            if not has_long_url_rule and len(url) > 75:
+                has_long_url_rule = True
+
+            # Rule 13: Insecure HTTP URL (Small = 1)
+            if not has_insecure_http_rule and url_lower.startswith('http://'):
+                has_insecure_http_rule = True
+
+        # Append triggered URL features and add to total score
+        if has_ip_rule:
+            total += 4
+            triggered.append({
+                'feature_name': 'IP Address in URL',
+                'severity': 'Big',
+                'priority_value': 4
+            })
+
+        if has_shortener_rule:
+            total += 2
+            triggered.append({
+                'feature_name': 'URL Shortener',
+                'severity': 'Medium',
+                'priority_value': 2
+            })
+
+        if has_suspicious_tld_rule:
+            total += 2
+            triggered.append({
+                'feature_name': 'Suspicious TLD',
+                'severity': 'Medium',
+                'priority_value': 2
+            })
+
+        if has_many_hyphens_rule:
+            total += 1
+            triggered.append({
+                'feature_name': 'Domain with Many Hyphens',
+                'severity': 'Small',
+                'priority_value': 1
+            })
+
+        if has_excessive_hyphens_rule:
+            total += 2
+            triggered.append({
+                'feature_name': 'Domain with Excessive Hyphens',
+                'severity': 'Medium',
+                'priority_value': 2
+            })
+
+        if has_long_url_rule:
+            total += 1
+            triggered.append({
+                'feature_name': 'Suspiciously Long URL',
+                'severity': 'Small',
+                'priority_value': 1
+            })
+
+        if has_insecure_http_rule:
+            total += 1
+            triggered.append({
+                'feature_name': 'Insecure HTTP URL',
+                'severity': 'Small',
+                'priority_value': 1
+            })
+
         # ── FINAL SCORING ─────────────────────────────────────────────────
 
-        # Ensure score doesn't go below 0
         total = max(0, total)
 
-        # This scorer only returns 'Suspicious' or 'Safe'.
-        # 'Confirmed Phishing' is exclusively assigned when PhishTank blacklist matches.
         if total >= 4:
             label = 'Suspicious'
         else:

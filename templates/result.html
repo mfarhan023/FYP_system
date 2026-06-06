@@ -95,7 +95,7 @@
                 </div>
                 {% if session.get('is_admin') %}
                 <span class="label-badge {% if feature.severity == 'Big' %}label-danger{% elif feature.severity == 'Medium' %}label-warning{% else %}label-neutral{% endif %}">
-                    +{{ feature.points }} pts
+                    +{{ feature.priority_value }} pts
                 </span>
                 {% endif %}
             </div>

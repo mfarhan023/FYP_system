@@ -41,15 +41,31 @@ class AnalyzerEngine:
             return True
 
         # 2. Domain-level match
+        EXCLUDED_FROM_DOMAIN_MATCH = {
+            'bit.ly', 'tinyurl.com', 't.co', 'goo.gl', 'ow.ly', 'is.gd', 'buff.ly',
+            'rb.gy', 'cutt.ly', 'tiny.cc', 'shorturl.at', 'clck.ru', 'su.pr', 'adf.ly',
+            'google.com', 'drive.google.com', 'docs.google.com', 'sites.google.com',
+            'dropbox.com', 'github.com', 'github.io', 'vercel.app', 'herokuapp.com',
+            's3.amazonaws.com', 'storage.googleapis.com', 'dropboxusercontent.com',
+            'facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com', 'youtube.com',
+            'outlook.com', 'microsoft.com', 'live.com', 'apple.com', 'icloud.com'
+        }
+
         try:
             domain = urlparse(normalized).netloc
             if domain:
-                cursor.execute(
-                    "SELECT 1 FROM blacklist WHERE url LIKE %s LIMIT 1",
-                    (f'%{domain}%',)
-                )
-                if cursor.fetchone():
-                    return True
+                clean_domain = domain.lower()
+                if clean_domain.startswith('www.'):
+                    clean_domain = clean_domain[4:]
+
+                if clean_domain not in EXCLUDED_FROM_DOMAIN_MATCH:
+                    # Precise prefix match to prevent substring/spoofing false positives
+                    cursor.execute(
+                        "SELECT 1 FROM blacklist WHERE url LIKE %s OR url LIKE %s OR url = %s OR url = %s LIMIT 1",
+                        (f'http://{domain}/%', f'https://{domain}/%', f'http://{domain}', f'https://{domain}')
+                    )
+                    if cursor.fetchone():
+                        return True
         except Exception:
             pass
 
@@ -98,11 +114,25 @@ class AnalyzerEngine:
                     for url in urls:
                         is_bl = self._check_url(url, cur)
                         # Fallback to PhishTank API check if not found in local DB
+                        is_from_api = False
                         if not is_bl:
                             is_bl = self._check_url_via_api(url)
+                            is_from_api = True
                         
                         if is_bl:
                             any_blacklisted = True
+                            if is_from_api:
+                                try:
+                                    normalized = url.strip().lower().rstrip('/')
+                                    cur.execute(
+                                        'INSERT INTO blacklist (url) VALUES (%s) ON CONFLICT (url) DO NOTHING',
+                                        (normalized,)
+                                    )
+                                    conn.commit()
+                                except Exception as db_write_err:
+                                    conn.rollback()
+                                    print(f"[Database Error] Failed to cache blacklisted URL: {db_write_err}")
+                        
                         url_evidence.append({
                             'url': url,
                             'blacklisted': is_bl,
