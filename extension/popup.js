@@ -7,15 +7,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const scanSource = document.getElementById('scanSource');
   const riskBadge = document.getElementById('riskBadge');
 
-  
   const urlCount = document.getElementById('urlCount');
   const urlList = document.getElementById('urlList');
   const featureCount = document.getElementById('featureCount');
   const featureList = document.getElementById('featureList');
-
+  
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const apiUrlInput = document.getElementById('apiUrlInput');
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
   
   const rescanBtn = document.getElementById('rescanBtn');
-
+  const manualScanToggleBtn = document.getElementById('manualScanToggleBtn');
+  const manualScanCard = document.getElementById('manualScanCard');
+  const manualTextarea = document.getElementById('manualTextarea');
+  const runManualScanBtn = document.getElementById('runManualScanBtn');
+  const cancelManualScanBtn = document.getElementById('cancelManualScanBtn');
   
   const errorCard = document.getElementById('errorCard');
   const errorText = document.getElementById('errorText');
@@ -27,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Initialize Settings ---
   const DEFAULT_API_URL = 'http://localhost:5000';
   let apiUrl = localStorage.getItem('ezveri_api_url') || DEFAULT_API_URL;
-
+  apiUrlInput.value = apiUrl;
 
   // --- Accordion Toggles ---
   document.querySelectorAll('.accordion-header').forEach(header => {
@@ -37,9 +44,56 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // --- Settings Panel Toggle ---
+  settingsBtn.addEventListener('click', () => {
+    settingsPanel.classList.toggle('hidden');
+  });
 
+  saveSettingsBtn.addEventListener('click', () => {
+    let url = apiUrlInput.value.trim();
+    if (url.endsWith('/')) {
+      url = url.slice(0, -1);
+    }
+    if (!url) {
+      url = DEFAULT_API_URL;
+    }
+    localStorage.setItem('ezveri_api_url', url);
+    apiUrl = url;
+    settingsPanel.classList.add('hidden');
+    
+    // Re-scan
+    startAutomaticScan();
+  });
 
+  // --- Manual Scan Controls ---
+  manualScanToggleBtn.addEventListener('click', () => {
+    resultCard.classList.add('hidden');
+    errorCard.classList.add('hidden');
+    statusSection.classList.add('hidden');
+    manualScanCard.classList.remove('hidden');
+    manualTextarea.value = '';
+    manualTextarea.focus();
+  });
 
+  cancelManualScanBtn.addEventListener('click', () => {
+    manualScanCard.classList.add('hidden');
+    if (activeTextContent) {
+      resultCard.classList.remove('hidden');
+    } else {
+      statusSection.classList.remove('hidden');
+      startAutomaticScan();
+    }
+  });
+
+  runManualScanBtn.addEventListener('click', () => {
+    const text = manualTextarea.value.trim();
+    if (!text || text.length < 5) {
+      alert("Please enter at least 5 characters to scan.");
+      return;
+    }
+    manualScanCard.classList.add('hidden');
+    analyzeContent(text, "Manual Input");
+  });
 
   // --- Rescan & Retry ---
   rescanBtn.addEventListener('click', startAutomaticScan);
@@ -53,7 +107,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       if (!tabs || tabs.length === 0) {
-        showError("No active tab found.");
+        showError("No active tab found. Use manual scan instead.");
+        showManualScan();
         return;
       }
       
@@ -67,7 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chrome.runtime.lastError) {
           // scripting not allowed on pages like chrome:// or settings
           console.warn("Scripting failed: ", chrome.runtime.lastError.message);
-          showError("Cannot access this page (restricted tab).");
+          showError("Cannot access this page (restricted tab). Please paste your text manually.");
+          showManualScan();
           return;
         }
 
@@ -79,9 +135,11 @@ document.addEventListener('DOMContentLoaded', () => {
             analyzeContent(data.text, data.source);
           } else {
             showError("No email content or readable page text detected.");
+            showManualScan();
           }
         } else {
-          showError("Failed to extract page text.");
+          showError("Failed to extract page text. Try copy-pasting manually.");
+          showManualScan();
         }
       });
     });
@@ -169,10 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderResults(res, source) {
     statusSection.classList.add('hidden');
     errorCard.classList.add('hidden');
-    const manualScanCard = document.getElementById('manualScanCard');
-    if (manualScanCard) {
-      manualScanCard.classList.add('hidden');
-    }
+    manualScanCard.classList.add('hidden');
     resultCard.classList.remove('hidden');
 
     scanSource.textContent = source;
@@ -191,8 +246,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       riskBadge.classList.add('risk-safe');
     }
-
-
 
     // 3. URLs Populating
     const evidence = res.url_evidence || [];
@@ -326,6 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
     statusSection.classList.remove('hidden');
     resultCard.classList.add('hidden');
     errorCard.classList.add('hidden');
+    manualScanCard.classList.add('hidden');
     statusText.textContent = msg;
   }
 
@@ -333,6 +387,13 @@ document.addEventListener('DOMContentLoaded', () => {
     statusSection.classList.add('hidden');
     resultCard.classList.add('hidden');
     errorCard.classList.remove('hidden');
+    manualScanCard.classList.add('hidden');
     errorText.textContent = msg;
+  }
+
+  function showManualScan() {
+    manualScanCard.classList.remove('hidden');
+    manualTextarea.value = '';
+    manualTextarea.focus();
   }
 });

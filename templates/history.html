@@ -30,56 +30,66 @@
     </div>
 
     {% if analyses %}
-    <div class="card" style="margin-top:2rem;">
-        <div class="card-header">
-            <h2>Scan Records</h2>
-            <span class="badge-pill">{{ analyses|length }} TOTAL</span>
+    <form id="bulkDeleteForm" method="POST" action="{{ url_for('delete_bulk') }}">
+        <div class="card" style="margin-top:2rem;">
+            <div class="card-header" style="display: flex; align-items: center; justify-content: space-between;">
+                <h2>Scan Records</h2>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button type="submit" id="btnDeleteSelected" class="action-btn action-delete" style="display: none; font-size: 0.85rem; padding: 6px 14px; margin-right: 0;" onclick="return confirm('Delete all selected records?');">
+                        🗑️ Delete Selected (<span id="selectedCount">0</span>)
+                    </button>
+                    <span class="badge-pill">{{ analyses|length }} TOTAL</span>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAllCheckbox" style="cursor: pointer; width: 16px; height: 16px;"></th>
+                            <th>#</th>
+                            <th>Timestamp</th>
+                            <th>Result</th>
+                            <th>URLs Found</th>
+                            <th>Blacklisted</th>
+                            <th>Preview</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in analyses %}
+                        <tr>
+                            <td style="text-align: center;"><input type="checkbox" name="selected_ids" value="{{ a.id }}" class="record-checkbox" style="cursor: pointer; width: 16px; height: 16px;"></td>
+                            <td class="td-id">{{ loop.revindex }}</td>
+                            <td class="td-ts">{{ a.timestamp }}</td>
+                            <td>
+                                {% if a.label == 'Confirmed Phishing' %}
+                                <span class="label-badge label-danger">🚨 Confirmed Phishing</span>
+                                {% elif a.label == 'Suspicious' %}
+                                <span class="label-badge label-warning">⚠️ Suspicious</span>
+                                {% else %}
+                                <span class="label-badge label-success">✅ Low Risk</span>
+                                {% endif %}
+                            </td>
+                            <td class="td-num">{{ a.url_count }}</td>
+                            <td class="td-num {% if a.blacklisted_count > 0 %}td-threat{% endif %}">{{ a.blacklisted_count }}</td>
+                            <td class="td-preview">{{ a.content_preview[:80] }}{% if a.content_preview|length > 80 %}…{% endif %}</td>
+                            <td class="td-actions">
+                                <a href="{{ url_for('result', analysis_id=a.id) }}" class="action-btn action-view">View</a>
+                                <button type="button" class="action-btn action-delete" onclick="if(confirm('Delete this record?')) { document.getElementById('delete-form-{{ a.id }}').submit(); }">Delete</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <div class="table-responsive">
-            <table class="history-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Timestamp</th>
-                        <th>Result</th>
-                        <th>URLs Found</th>
-                        <th>Blacklisted</th>
-                        <th>Preview</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for a in analyses %}
-                    <tr>
-                        <td class="td-id">{{ loop.revindex }}</td>
-                        <td class="td-ts">{{ a.timestamp }}</td>
-                        <td>
-                            {% if a.label == 'Confirmed Phishing' %}
-                            <span class="label-badge label-danger">🚨 Confirmed Phishing</span>
-                            {% elif a.label == 'Suspicious' %}
-                            <span class="label-badge label-warning">⚠️ Suspicious</span>
-                            {% else %}
-                            <span class="label-badge label-success">✅ Low Risk</span>
-                            {% endif %}
-                        </td>
-                        <td class="td-num">{{ a.url_count }}</td>
-                        <td class="td-num {% if a.blacklisted_count > 0 %}td-threat{% endif %}">{{ a.blacklisted_count
-                            }}</td>
-                        <td class="td-preview">{{ a.content_preview[:80] }}{% if a.content_preview|length > 80 %}…{%
-                            endif %}</td>
-                        <td class="td-actions">
-                            <a href="{{ url_for('result', analysis_id=a.id) }}" class="action-btn action-view">View</a>
-                            <form method="POST" action="{{ url_for('delete_analysis', analysis_id=a.id) }}"
-                                style="display:inline;" onsubmit="return confirm('Delete this record?');">
-                                <button type="submit" class="action-btn action-delete">Delete</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    </form>
+
+    {# Separate individual delete forms so they submit via POST correctly outside the bulk delete form #}
+    {% for a in analyses %}
+    <form id="delete-form-{{ a.id }}" method="POST" action="{{ url_for('delete_analysis', analysis_id=a.id) }}" style="display:none;"></form>
+    {% endfor %}
+
     {% else %}
     <div class="empty-page">
         <div class="empty-icon">🔍</div>
@@ -89,4 +99,45 @@
     </div>
     {% endif %}
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const checkboxes = document.querySelectorAll('.record-checkbox');
+    const deleteBtn = document.getElementById('btnDeleteSelected');
+    const selectedCountSpan = document.getElementById('selectedCount');
+
+    function updateDeleteButtonVisibility() {
+        const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
+        if (checkedCount > 0) {
+            deleteBtn.style.display = 'inline-flex';
+            selectedCountSpan.textContent = checkedCount;
+        } else {
+            deleteBtn.style.display = 'none';
+        }
+        
+        // Update select all checkbox state
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = (checkedCount === checkboxes.length && checkboxes.length > 0);
+        }
+    }
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function () {
+            checkboxes.forEach(cb => {
+                cb.checked = selectAllCheckbox.checked;
+            });
+            updateDeleteButtonVisibility();
+        });
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', function () {
+            updateDeleteButtonVisibility();
+        });
+    });
+});
+</script>
 {% endblock %}

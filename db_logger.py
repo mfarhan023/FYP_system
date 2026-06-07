@@ -78,7 +78,7 @@ class DbLogger:
                     RETURNING id
                 ''', (
                     timestamp,
-                    result.get('email_preview', '')[:200],
+                    result.get('email_preview', ''),
                     result.get('label', 'Unknown'),
                     result.get('url_count', 0),
                     result.get('blacklisted_count', 0),

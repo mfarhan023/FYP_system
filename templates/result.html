@@ -173,11 +173,8 @@
         <div class="card-header">
             <h2>Content Preview</h2>
         </div>
-        <div class="email-preview">
+        <div class="email-preview" style="white-space: pre-wrap; word-break: break-word;">
             {{ result.content_preview if result.content_preview else result.email_preview }}
-            {% if (result.content_preview or result.email_preview)|length >= 199 %}
-            <span class="preview-truncated"> …(truncated)</span>
-            {% endif %}
         </div>
     </div>
 

@@ -3,6 +3,7 @@ import io
 from functools import wraps
 # pyrefly: ignore [missing-import]
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session, jsonify
+from flask_cors import CORS
 from dotenv import load_dotenv
 from analyzer_engine import AnalyzerEngine
 from heuristic_scorer import WeightedHeuristicScorer
@@ -12,6 +13,7 @@ from db_logger import DbLogger
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 app.secret_key = os.environ.get('SECRET_KEY', 'ezveri-phish-secret-2024')
 
 @app.after_request
@@ -149,16 +151,21 @@ def api_analyze():
     if request.method == 'OPTIONS':
         return '', 204
 
-    data = request.get_json(silent=True) or {}
-    email_text = data.get('email_content', '').strip()
+    # Accept JSON or form data
+    if request.is_json:
+        data = request.get_json() or {}
+        email_text = data.get('email_content', '').strip()
+    else:
+        email_text = request.form.get('email_content', '').strip()
 
     if not email_text:
-        return jsonify({'status': 'error', 'message': 'No email content provided.'}), 400
+        return jsonify({'status': 'error', 'message': 'Please provide email content to analyze.'}), 400
     if len(email_text) < 5:
-        return jsonify({'status': 'error', 'message': 'Content is too short.'}), 400
+        return jsonify({'status': 'error', 'message': 'Content is too short. Please provide more text.'}), 400
 
     result = engine.analyze(email_text)
 
+    # Heuristic fallback
     if result['blacklisted_count'] == 0:
         heuristic = heuristic_scorer.score(email_text, result['urls_found'])
         result['heuristic_label']     = heuristic['label']
@@ -171,12 +178,15 @@ def api_analyze():
         result['heuristic_score']    = None
         result['triggered_features'] = []
 
-    if logger:
+    analysis_id = None
+    if logger is not None:
         try:
             analysis_id = logger.log_result(result)
-            result['id'] = analysis_id
-        except Exception as e:
-            print(f"[API Error] Failed to log result: {e}")
+        except Exception as log_err:
+            import sys
+            print(f"[API ERROR] Failed to log result: {log_err}", file=sys.stderr)
+
+    result['id'] = analysis_id
 
     return jsonify({
         'status': 'success',
@@ -238,6 +248,27 @@ def delete_analysis(analysis_id):
     except Exception as e:
         flash(f'Error: {e}', 'error')
     return redirect(url_for('history'))
+
+
+@app.route('/delete-bulk', methods=['POST'])
+@admin_required
+def delete_bulk():
+    selected_ids = request.form.getlist('selected_ids')
+    if not selected_ids:
+        flash('No records selected.', 'warning')
+        return redirect(url_for('history'))
+
+    deleted_count = 0
+    try:
+        for str_id in selected_ids:
+            analysis_id = int(str_id)
+            logger.delete_analysis(analysis_id)
+            deleted_count += 1
+        flash(f'Successfully deleted {deleted_count} records.', 'success')
+    except Exception as e:
+        flash(f'Error during bulk deletion: {e}', 'error')
+    return redirect(url_for('history'))
+
 
 
 if __name__ == '__main__':
