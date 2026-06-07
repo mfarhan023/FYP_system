@@ -297,12 +297,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let headerText = "";
         
         if (typeof feat === 'object' && feat !== null) {
-          const priority = feat.priority_value || (feat.severity === 'Big' ? 4 : (feat.severity === 'Medium' ? 2 : 1));
           let evidenceText = "";
           if (feat.evidence && Array.isArray(feat.evidence) && feat.evidence.length > 0) {
             evidenceText = ` <span style="font-weight: normal; color: var(--text-secondary); font-style: italic;">(${feat.evidence.map(item => `"${item}"`).join(', ')})</span>`;
           }
-          headerText = `${feat.feature_name} (+${priority} pts)${evidenceText}`;
+          headerText = `${feat.feature_name}${evidenceText}`;
         } else {
           headerText = feat;
         }
