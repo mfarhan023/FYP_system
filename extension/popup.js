@@ -18,11 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveSettingsBtn = document.getElementById('saveSettingsBtn');
   
   const rescanBtn = document.getElementById('rescanBtn');
-  const manualScanToggleBtn = document.getElementById('manualScanToggleBtn');
-  const manualScanCard = document.getElementById('manualScanCard');
-  const manualTextarea = document.getElementById('manualTextarea');
-  const runManualScanBtn = document.getElementById('runManualScanBtn');
-  const cancelManualScanBtn = document.getElementById('cancelManualScanBtn');
   
   const errorCard = document.getElementById('errorCard');
   const errorText = document.getElementById('errorText');
@@ -65,36 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
     startAutomaticScan();
   });
 
-  // --- Manual Scan Controls ---
-  manualScanToggleBtn.addEventListener('click', () => {
-    resultCard.classList.add('hidden');
-    errorCard.classList.add('hidden');
-    statusSection.classList.add('hidden');
-    manualScanCard.classList.remove('hidden');
-    manualTextarea.value = '';
-    manualTextarea.focus();
-  });
-
-  cancelManualScanBtn.addEventListener('click', () => {
-    manualScanCard.classList.add('hidden');
-    if (activeTextContent) {
-      resultCard.classList.remove('hidden');
-    } else {
-      statusSection.classList.remove('hidden');
-      startAutomaticScan();
-    }
-  });
-
-  runManualScanBtn.addEventListener('click', () => {
-    const text = manualTextarea.value.trim();
-    if (!text || text.length < 5) {
-      alert("Please enter at least 5 characters to scan.");
-      return;
-    }
-    manualScanCard.classList.add('hidden');
-    analyzeContent(text, "Manual Input");
-  });
-
   // --- Rescan & Retry ---
   rescanBtn.addEventListener('click', startAutomaticScan);
   retryBtn.addEventListener('click', startAutomaticScan);
@@ -107,8 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       if (!tabs || tabs.length === 0) {
-        showError("No active tab found. Use manual scan instead.");
-        showManualScan();
+        showError("No active tab found.");
         return;
       }
       
@@ -122,8 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chrome.runtime.lastError) {
           // scripting not allowed on pages like chrome:// or settings
           console.warn("Scripting failed: ", chrome.runtime.lastError.message);
-          showError("Cannot access this page (restricted tab). Please paste your text manually.");
-          showManualScan();
+          showError("Cannot access this page (restricted tab).");
           return;
         }
 
@@ -135,11 +98,9 @@ document.addEventListener('DOMContentLoaded', () => {
             analyzeContent(data.text, data.source);
           } else {
             showError("No email content or readable page text detected.");
-            showManualScan();
           }
         } else {
-          showError("Failed to extract page text. Try copy-pasting manually.");
-          showManualScan();
+          showError("Failed to extract page text.");
         }
       });
     });
@@ -227,7 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderResults(res, source) {
     statusSection.classList.add('hidden');
     errorCard.classList.add('hidden');
-    manualScanCard.classList.add('hidden');
     resultCard.classList.remove('hidden');
 
     scanSource.textContent = source;
@@ -361,7 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
     statusSection.classList.remove('hidden');
     resultCard.classList.add('hidden');
     errorCard.classList.add('hidden');
-    manualScanCard.classList.add('hidden');
     statusText.textContent = msg;
   }
 
@@ -369,13 +328,6 @@ document.addEventListener('DOMContentLoaded', () => {
     statusSection.classList.add('hidden');
     resultCard.classList.add('hidden');
     errorCard.classList.remove('hidden');
-    manualScanCard.classList.add('hidden');
     errorText.textContent = msg;
-  }
-
-  function showManualScan() {
-    manualScanCard.classList.remove('hidden');
-    manualTextarea.value = '';
-    manualTextarea.focus();
   }
 });
