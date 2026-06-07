@@ -328,46 +328,28 @@ document.addEventListener('DOMContentLoaded', () => {
       features.forEach(feat => {
         const li = document.createElement('li');
         li.style.display = 'flex';
-        li.style.flexDirection = 'column';
-        li.style.gap = '4px';
+        li.style.alignItems = 'flex-start';
+        li.style.gap = '6px';
         li.style.width = '100%';
         li.style.padding = '6px 0';
         li.style.borderBottom = '1px solid var(--border-color)';
         
         let headerText = "";
-        let evidenceHtml = "";
         
         if (typeof feat === 'object' && feat !== null) {
           const priority = feat.priority_value || (feat.severity === 'Big' ? 4 : (feat.severity === 'Medium' ? 2 : 1));
-          headerText = `${feat.feature_name} (+${priority} pts)`;
-          
+          let evidenceText = "";
           if (feat.evidence && Array.isArray(feat.evidence) && feat.evidence.length > 0) {
-            evidenceHtml = `
-              <div class="evidence-container" style="margin-top: 4px; padding: 6px 8px; background: rgba(255,255,255,0.03); border-left: 2px solid ${
-                feat.severity === 'Big' ? 'var(--color-phishing)' : (feat.severity === 'Medium' ? 'var(--color-suspicious)' : 'var(--text-secondary)')
-              }; border-radius: 2px; font-size: 11px; width: 100%; box-sizing: border-box;">
-                <span style="font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 2px; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px;">Evidence / Bukti:</span>
-                <ul style="margin: 0; padding-left: 12px; list-style-type: disc; color: var(--text-primary); display: flex; flex-direction: column; gap: 2px;">
-                  ${feat.evidence.map(item => {
-                    if (item.startsWith('http://') || item.startsWith('https://') || item.startsWith('www.')) {
-                      return `<li style="font-style: italic; word-break: break-all;"><code style="font-family: monospace; background: rgba(255,255,255,0.05); padding: 1px 3px; border-radius: 2px;">${item}</code></li>`;
-                    }
-                    return `<li style="font-style: italic; word-break: break-word;">"${item}"</li>`;
-                  }).join('')}
-                </ul>
-              </div>
-            `;
+            evidenceText = ` <span style="font-weight: normal; color: var(--text-secondary); font-style: italic;">(${feat.evidence.map(item => `"${item}"`).join(', ')})</span>`;
           }
+          headerText = `${feat.feature_name} (+${priority} pts)${evidenceText}`;
         } else {
           headerText = feat;
         }
         
         li.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text-primary);">
-            <span style="color: var(--color-suspicious); font-weight: bold; font-size: 14px;">•</span>
-            <span>${headerText}</span>
-          </div>
-          ${evidenceHtml}
+          <span style="color: var(--color-suspicious); font-weight: bold; font-size: 14px; line-height: 1.2;">•</span>
+          <span style="font-weight: 500; color: var(--text-primary); line-height: 1.4; word-break: break-word;">${headerText}</span>
         `;
         featureList.appendChild(li);
       });
