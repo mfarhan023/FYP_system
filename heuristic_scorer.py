@@ -61,8 +61,18 @@ class WeightedHeuristicScorer:
         '.xyz', '.tk', '.ru', '.cn', '.top', '.club', '.info', '.biz', '.click', '.download', '.zip', '.id'
     ]
 
+    def _get_matched_phrases(self, text: str, phrases: list) -> list:
+        """Find which phrases match the text using word boundaries to avoid false positives."""
+        matched = []
+        for p in phrases:
+            # Match case-insensitively with word boundaries
+            pattern = re.compile(r'\b' + re.escape(p.lower()) + r'\b')
+            if pattern.search(text):
+                matched.append(p)
+        return matched
+
     def _find_trigger_evidence(self, email_text: str, phrases: list) -> list:
-        """Find sentences in email_text containing any of the matched phrases."""
+        """Find sentences in email_text containing any of the matched phrases (respecting word boundaries)."""
         lines = email_text.split('\n')
         sentences = []
         for line in lines:
@@ -75,9 +85,9 @@ class WeightedHeuristicScorer:
 
         evidences = []
         for phrase in phrases:
-            phrase_lower = phrase.lower()
+            pattern = re.compile(r'\b' + re.escape(phrase.lower()) + r'\b')
             for sentence in sentences:
-                if phrase_lower in sentence.lower():
+                if pattern.search(sentence.lower()):
                     if sentence not in evidences:
                         evidences.append(sentence)
         return evidences
@@ -90,7 +100,7 @@ class WeightedHeuristicScorer:
         # ── TEXT-BASED RULES ──────────────────────────────────────────────
 
         # Rule 1: Sensitive Information Request (Big = 4)
-        matched_sensitive = [p for p in self.SENSITIVE_PHRASES if p in text]
+        matched_sensitive = self._get_matched_phrases(text, self.SENSITIVE_PHRASES)
         if matched_sensitive:
             total += 4
             triggered.append({
@@ -101,7 +111,7 @@ class WeightedHeuristicScorer:
             })
 
         # Rule 2: Reward or Prize Language (Medium = 2)
-        matched_reward = [p for p in self.REWARD_PHRASES if p in text]
+        matched_reward = self._get_matched_phrases(text, self.REWARD_PHRASES)
         if matched_reward:
             total += 2
             triggered.append({
@@ -112,7 +122,7 @@ class WeightedHeuristicScorer:
             })
 
         # Rule 3: Threat Language (Medium = 2)
-        matched_threat = [p for p in self.THREAT_PHRASES if p in text]
+        matched_threat = self._get_matched_phrases(text, self.THREAT_PHRASES)
         if matched_threat:
             total += 2
             triggered.append({
@@ -123,7 +133,7 @@ class WeightedHeuristicScorer:
             })
 
         # Rule 4: Urgency Language (Medium = 2)
-        matched_urgency = [p for p in self.URGENCY_PHRASES if p in text]
+        matched_urgency = self._get_matched_phrases(text, self.URGENCY_PHRASES)
         if matched_urgency:
             total += 2
             triggered.append({
@@ -134,7 +144,7 @@ class WeightedHeuristicScorer:
             })
 
         # Rule 5: Time Pressure Language (Small = 1)
-        matched_time = [p for p in self.TIME_PRESSURE_PHRASES if p in text]
+        matched_time = self._get_matched_phrases(text, self.TIME_PRESSURE_PHRASES)
         if matched_time:
             total += 1
             triggered.append({
@@ -145,7 +155,7 @@ class WeightedHeuristicScorer:
             })
 
         # Rule 6: Generic Click Phrase (Small = 1)
-        matched_click = [p for p in self.CLICK_PHRASES if p in text]
+        matched_click = self._get_matched_phrases(text, self.CLICK_PHRASES)
         if matched_click:
             total += 1
             triggered.append({
