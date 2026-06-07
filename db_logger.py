@@ -65,7 +65,9 @@ class DbLogger:
             conn.commit()
 
     def log_result(self, result: dict) -> int:
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        from datetime import timezone, timedelta
+        malaysia_tz = timezone(timedelta(hours=8))
+        timestamp = datetime.now(malaysia_tz).strftime('%Y-%m-%d %H:%M:%S')
         with self._connect() as conn:
             with conn.cursor() as c:
                 # Serialize triggered_features list to JSON string for storage
