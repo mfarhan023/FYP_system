@@ -118,7 +118,16 @@ class DbLogger:
                 # Deserialize triggered_features JSON string back to a list
                 raw_features = result.get('triggered_features') or '[]'
                 try:
-                    result['triggered_features'] = json.loads(raw_features)
+                    features = json.loads(raw_features)
+                    if isinstance(features, list):
+                        severity_map = {'Big': 4, 'Medium': 2, 'Small': 1}
+                        for feat in features:
+                            if isinstance(feat, dict):
+                                if 'priority_value' not in feat or feat['priority_value'] is None:
+                                    feat['priority_value'] = severity_map.get(feat.get('severity'), 1)
+                    else:
+                        features = []
+                    result['triggered_features'] = features
                 except (json.JSONDecodeError, TypeError):
                     result['triggered_features'] = []
                 c.execute('SELECT * FROM url_log WHERE analysis_id = %s', (analysis_id,))

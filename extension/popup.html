@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EzVeriPhish</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <img src="icons/icon16.png" class="logo-img" alt="Shield Logo" />
+        <h1 class="logo-text">EzVeri<span class="gradient-text">Phish</span></h1>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-main">
+      
+      <!-- Scan Status / Loading -->
+      <div id="statusSection" class="status-section">
+        <div class="spinner"></div>
+        <p id="statusText">Scanning active email...</p>
+      </div>
+
+      <!-- Result Card (Shown after scan) -->
+      <div id="resultCard" class="result-card hidden">
+        <div class="result-header">
+          <span class="source-tag" id="scanSource">Gmail Content</span>
+          <h2 class="risk-badge" id="riskBadge">Analyzing...</h2>
+        </div>
+        
+
+
+        <!-- Detail Sections -->
+        <div class="detail-accordion">
+          <!-- URLs Found -->
+          <div class="accordion-item" id="urlsAccordion">
+            <button class="accordion-header">
+              <span>Links Detected (<span id="urlCount">0</span>)</span>
+              <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </button>
+            <div class="accordion-content">
+              <ul id="urlList" class="url-list">
+                <!-- Dynamically populated -->
+              </ul>
+            </div>
+          </div>
+
+          <!-- Heuristic Features -->
+          <div class="accordion-item" id="heuristicsAccordion">
+            <button class="accordion-header">
+              <span>Triggered Suspicious Features (<span id="featureCount">0</span>)</span>
+              <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </button>
+            <div class="accordion-content">
+              <ul id="featureList" class="feature-list">
+                <!-- Dynamically populated -->
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="result-actions">
+          <button id="rescanBtn" class="btn-secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px; vertical-align: -1px;">
+              <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+              <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Error Card (Shown on failure) -->
+      <div id="errorCard" class="error-card hidden">
+        <div class="error-icon">⚠️</div>
+        <h3>Failed to Connect</h3>
+        <p id="errorText">Could not connect to EzVeriPhish server. Please check that the server is running.</p>
+        <button id="retryBtn" class="btn-primary">Retry Connection</button>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>EzVeriPhish Engine v1.0 • Protected</p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
