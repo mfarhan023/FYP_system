@@ -12,11 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const featureCount = document.getElementById('featureCount');
   const featureList = document.getElementById('featureList');
   
-  const settingsBtn = document.getElementById('settingsBtn');
-  const settingsPanel = document.getElementById('settingsPanel');
-  const apiUrlInput = document.getElementById('apiUrlInput');
-  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-  
   const rescanBtn = document.getElementById('rescanBtn');
   
   const errorCard = document.getElementById('errorCard');
@@ -29,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Initialize Settings ---
   const DEFAULT_API_URL = 'http://localhost:5000';
   let apiUrl = localStorage.getItem('ezveri_api_url') || DEFAULT_API_URL;
-  apiUrlInput.value = apiUrl;
 
   // --- Accordion Toggles ---
   document.querySelectorAll('.accordion-header').forEach(header => {
@@ -37,27 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const item = header.parentElement;
       item.classList.toggle('active');
     });
-  });
-
-  // --- Settings Panel Toggle ---
-  settingsBtn.addEventListener('click', () => {
-    settingsPanel.classList.toggle('hidden');
-  });
-
-  saveSettingsBtn.addEventListener('click', () => {
-    let url = apiUrlInput.value.trim();
-    if (url.endsWith('/')) {
-      url = url.slice(0, -1);
-    }
-    if (!url) {
-      url = DEFAULT_API_URL;
-    }
-    localStorage.setItem('ezveri_api_url', url);
-    apiUrl = url;
-    settingsPanel.classList.add('hidden');
-    
-    // Re-scan
-    startAutomaticScan();
   });
 
   // --- Rescan & Retry ---
